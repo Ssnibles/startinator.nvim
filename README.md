@@ -1,83 +1,49 @@
-# startinator.nvim 🚀
+# startinator.nvim
 
-A minimal, distraction-free, and blazingly fast startpage (dashboard) for Neovim written in pure Lua. Designed with usability, speed, and sleek aesthetics first.
+A minimal startpage for Neovim written in Lua.
 
-```
-                   N E O V I M
-                   ~/projects/my-app
+## Features
 
-                 ─ Actions ────────────────────────────────────
-                 󰈞  Find file                                 f
-                 󰝒  New file                                  n
-                 󰊢  Live grep                                 g
-                 󰅚  Quit                                      q
+- Automatic picker detection: uses `snacks.picker`, `fzf-lua`, `telescope`, `mini.pick`, or built-in fallbacks.
+- Recent files (MRU): displays recent files with dimmed directory paths, highlighted filenames, and single-key number shortcuts.
+- Direct keybindings: trigger actions and recent files directly without pressing Enter.
+- Window option preservation: saves and restores window options (`number`, `relativenumber`, `signcolumn`, `fillchars`, etc.) when opening files.
+- Modular layout: reorder sections or add custom render functions.
 
-                 ─ Recent ─────────────────────────────────────
-                 󰈔  lua/startinator/init.lua                  1
-                 󰈔  lua/startinator/render.lua                2
-                 󰈔  README.md                                 3
+## Installation
 
-                    j/k navigate  ·  <cr> select  ·  q quit
-```
-
----
-
-## ✨ Features
-
-- ⚡ **Sub-millisecond Speed**: Instant rendering (< 1ms) with zero overhead and zero external dependencies.
-- 🧘 **Modern & Sleek Aesthetics**: Clean, balanced block centering, subtle horizontal rule dividers (`─ Actions ──`), right-aligned hotkeys, hidden filler tildes (`~`), and clean cursorline highlighting.
-- 🚀 **Smart Pickers**: Automatically detects and uses `snacks.picker`, `fzf-lua`, `telescope`, `mini.pick`, or native Neovim fallbacks. Works out of the box with zero runtime errors on any setup.
-- ⌨️ **Usability First**:
-  - Direct instant hotkeys (`f`, `r`, `n`, `g`, `c`, `q`, `1`–`9`).
-  - Constrained, wrapping navigation (`j`/`k`, `<Tab>`/`<S-Tab>`, `<Down>`/`<Up>`).
-  - Immediate typing: press `i`, `a`, or `o` to open a new buffer in insert mode.
-  - Mouse click support (`<LeftMouse>`).
-- 🕒 **Fast MRU (Recent Files)**: Instant filesystem checks via `vim.uv.fs_stat`, ignores ephemeral files, aligns filename and path columns, and maps `1`–`9` hotkeys.
-- 🛡️ **Polite & Safe Window Management**: Automatically preserves and restores your original window options (`number`, `relativenumber`, `signcolumn`, `fillchars`, etc.) when navigating to a file. Reuses empty startup buffers without leaving orphaned buffers.
-- 🧩 **Extensible**: Clean chunk/span section pipeline with full backward compatibility for custom sections.
-
----
-
-## 📥 Installation
-
-### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
+### lazy.nvim
 
 ```lua
 {
   "josh/startinator.nvim",
-  opts = {
-    -- custom options (optional)
-  },
+  opts = {},
 }
 ```
 
-### Using [mini.deps](https://github.com/echasnovski/mini.deps)
+### mini.deps
 
 ```lua
-MiniDeps.add({
-  source = "josh/startinator.nvim",
-})
+MiniDeps.add({ source = "josh/startinator.nvim" })
 require("startinator").setup()
 ```
 
----
+## Configuration
 
-## ⚙️ Configuration & Defaults
-
-Startinator is completely usable out of the box with zero configuration. All defaults can be overridden:
+Default options:
 
 ```lua
 require("startinator").setup({
-  -- Layout alignment: "center" (content block horizontally centered) or "left"
+  -- Content block alignment: "center" or "left"
   align = "center",
-  width = 46,      -- Target width of the content block for aligned rules and hotkeys
+  width = 46,      -- Target width of the content block
   margin = 4,      -- Left margin when align = "left"
-  padding_top = 2, -- Minimum empty lines at top
+  padding_top = 0, -- Minimum top padding (0 centers vertically)
 
-  -- Automatically open when Neovim starts with an empty buffer
+  -- Open on startup when Neovim starts with an empty buffer
   auto_open = true,
 
-  -- Ordered sections to render
+  -- Ordered list of sections to render
   sections = {
     "header",
     "shortcuts",
@@ -88,15 +54,15 @@ require("startinator").setup({
   -- Header settings
   header = {
     enabled = true,
-    title = "  N E O V I M", -- Modern title string, or array of strings for ASCII art
-    cwd = true,                 -- Show current working directory path below title
-    greeting = false,           -- Dynamic time-of-day greeting (disabled by default)
+    title = "  N E O V I M", -- Title string or table of strings for ASCII art
+    cwd = true,                 -- Show current working directory below title
+    greeting = false,           -- Time-of-day greeting
   },
 
-  -- Quick action shortcuts
+  -- Action shortcuts
   shortcuts = {
     enabled = true,
-    title = "Actions",         -- Section title divider
+    title = "Actions",
     items = {
       { key = "f", icon = "󰈞", desc = "Find file", action = "find_files" },
       { key = "n", icon = "󰝒", desc = "New file", action = "new_file" },
@@ -105,13 +71,13 @@ require("startinator").setup({
     },
   },
 
-  -- Most Recently Used (MRU) files
+  -- Recent files (MRU)
   mru = {
     enabled = true,
-    title = "Recent",          -- Section title divider
-    limit = 5,                 -- Number of recent files to display
-    cwd_only = false,          -- Filter to files in current working directory
-    show_icons = true,         -- Show file type icons (mini.icons or nvim-web-devicons)
+    title = "Recent",
+    limit = 5,
+    cwd_only = false,
+    show_icons = true,
     ignore = {
       "%.git/",
       "COMMIT_EDITMSG",
@@ -124,10 +90,10 @@ require("startinator").setup({
   -- Footer settings
   footer = {
     enabled = true,
-    content = "hints",         -- "hints" for navigation key hints, or custom string/function
+    content = "hints", -- "hints" for key hints, or a custom string / function
   },
 
-  -- Buffer-local keymaps
+  -- Keybindings inside the dashboard buffer
   keymaps = {
     next = { "j", "<Down>", "<Tab>" },
     prev = { "k", "<Up>", "<S-Tab>" },
@@ -137,7 +103,7 @@ require("startinator").setup({
     mouse = "<LeftMouse>",
   },
 
-  -- Highlight groups (default links to standard Vim groups)
+  -- Highlight groups
   highlights = {
     Header = { link = "Title" },
     Cwd = { link = "Comment" },
@@ -155,41 +121,35 @@ require("startinator").setup({
 })
 ```
 
----
+## Commands
 
-## 🎮 Commands & Navigation
+- `:Startinator` — Open the dashboard.
+- `:StartinatorClose` — Close the dashboard.
+- `:StartinatorToggle` — Toggle the dashboard open or closed.
 
-### Commands
-
-- `:Startinator` — Open dashboard.
-- `:StartinatorClose` — Close dashboard (returns to previous buffer or quits if only buffer).
-- `:StartinatorToggle` — Toggle dashboard open / closed.
-
-### Keybindings inside the Dashboard
+## Keybindings
 
 | Key | Action |
 | :--- | :--- |
-| `j` / `<Down>` / `<Tab>` | Jump to next interactive item (wraps around) |
-| `k` / `<Up>` / `<S-Tab>` | Jump to previous interactive item (wraps around) |
-| `<CR>` / `<Space>` / `l` | Activate item under cursor |
-| `f`, `r`, `n`, `g`, `c`, `q` | Immediate action hotkeys |
-| `1` – `9` | Immediately open corresponding recent file |
-| `i` / `a` / `o` | Instantly create a new buffer and enter insert mode |
+| `j` / `<Down>` / `<Tab>` | Move to next item (wraps) |
+| `k` / `<Up>` / `<S-Tab>` | Move to previous item (wraps) |
+| `<CR>` / `<Space>` / `l` | Open item under cursor |
+| `f`, `n`, `g`, `q` | Run action shortcut |
+| `1` – `9` | Open recent file by index |
+| `i` / `a` / `o` | Create a new buffer and enter insert mode |
 | `q` / `<Esc>` | Close dashboard or quit Neovim |
-| `<LeftMouse>` | Click to activate any item |
+| `<LeftMouse>` | Activate clicked item |
 
----
+## Custom Sections
 
-## 🛠️ Adding Custom Sections
-
-You can add custom sections by providing a module name, a table with a `render` function, or a function directly:
+Add custom sections by providing a table with a `render(config)` function or a function directly:
 
 ```lua
 local quote_section = {
   render = function(config)
     return {
       lines = {
-        { { "💡 ", "Special" }, { '"Simplicity is prerequisite for reliability."', "Comment" } },
+        { { "Simplicity is prerequisite for reliability.", "Comment" } },
       },
       items = {},
     }
@@ -206,8 +166,29 @@ require("startinator").setup({
 })
 ```
 
----
+Interactive items can be included in custom sections:
 
-## 📄 License
+```lua
+local project_section = {
+  render = function(config)
+    return {
+      lines = {
+        { { "Projects", "StartinatorShortcutDesc" } },
+      },
+      items = {
+        {
+          line_idx = 1,
+          key = "p",
+          action = function()
+            -- custom action logic
+          end,
+        },
+      },
+    }
+  end,
+}
+```
+
+## License
 
 MIT
