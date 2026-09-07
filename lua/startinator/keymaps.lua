@@ -118,7 +118,15 @@ function M.setup(buf, config)
     vim.keymap.set("n", k, "<Nop>", opts)
   end
 
-  -- 5. Quick new file (starts typing immediately)
+  -- 5. Quick oil / file explorer
+  local oil_keys = to_list(km.oil or km.explorer or { "e" })
+  for _, k in ipairs(oil_keys) do
+    vim.keymap.set("n", k, function()
+      actions.oil()
+    end, opts)
+  end
+
+  -- 6. Quick new file (starts typing immediately)
   local new_keys = to_list(km.new_file or { "i", "a", "o" })
   for _, k in ipairs(new_keys) do
     vim.keymap.set("n", k, function()

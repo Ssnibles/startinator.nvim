@@ -102,18 +102,31 @@ function M.open()
     end,
   })
 
-  -- Restore original window options when navigating away to a file
-  vim.api.nvim_create_autocmd("BufLeave", {
+  local function restore_win_opts()
+    if vim.api.nvim_win_is_valid(win) then
+      for opt, val in pairs(saved_win_opts) do
+        pcall(vim.api.nvim_set_option_value, opt, val, { win = win })
+      end
+    end
+    pcall(vim.api.nvim_del_augroup_by_name, group_name)
+  end
+
+  -- Restore original window options when navigating away to a file or buffer is wiped
+  vim.api.nvim_create_autocmd("BufWipeout", {
     group = group,
     buffer = buf,
     once = true,
+    callback = restore_win_opts,
+  })
+
+  vim.api.nvim_create_autocmd("BufLeave", {
+    group = group,
+    buffer = buf,
     callback = function()
-      if vim.api.nvim_win_is_valid(win) then
-        for opt, val in pairs(saved_win_opts) do
-          pcall(vim.api.nvim_set_option_value, opt, val, { win = win })
-        end
+      -- If the window is no longer showing the startinator buffer (e.g. edited a new file)
+      if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) ~= buf then
+        restore_win_opts()
       end
-      pcall(vim.api.nvim_del_augroup_by_name, group_name)
     end,
   })
 end

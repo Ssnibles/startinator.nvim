@@ -65,6 +65,7 @@ require("startinator").setup({
     title = "Actions",
     items = {
       { key = "f", icon = "󰈞", desc = "Find file", action = "find_files" },
+      { key = "e", icon = "󰉓", desc = "File explorer", action = "oil" },
       { key = "n", icon = "󰝒", desc = "New file", action = "new_file" },
       { key = "g", icon = "󰊢", desc = "Live grep", action = "live_grep" },
       { key = "q", icon = "󰅚", desc = "Quit", action = "quit" },
@@ -76,7 +77,7 @@ require("startinator").setup({
     enabled = true,
     title = "Recent",
     limit = 5,
-    cwd_only = false,
+    cwd_only = true,
     show_icons = true,
     ignore = {
       "%.git/",
@@ -98,6 +99,7 @@ require("startinator").setup({
     next = { "j", "<Down>", "<Tab>" },
     prev = { "k", "<Up>", "<S-Tab>" },
     select = { "<CR>", "<Space>", "l" },
+    oil = { "e" },
     new_file = { "i", "a", "o" },
     quit = { "q", "<Esc>" },
     mouse = "<LeftMouse>",
@@ -134,7 +136,7 @@ require("startinator").setup({
 | `j` / `<Down>` / `<Tab>` | Move to next item (wraps) |
 | `k` / `<Up>` / `<S-Tab>` | Move to previous item (wraps) |
 | `<CR>` / `<Space>` / `l` | Open item under cursor |
-| `f`, `n`, `g`, `q` | Run action shortcut |
+| `f`, `e`, `n`, `g`, `q` | Run action shortcut (`e` runs `oil.toggle_float()`) |
 | `1` – `9` | Open recent file by index |
 | `i` / `a` / `o` | Create a new buffer and enter insert mode |
 | `q` / `<Esc>` | Close dashboard or quit Neovim |

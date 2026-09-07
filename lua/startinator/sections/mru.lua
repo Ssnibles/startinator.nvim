@@ -10,6 +10,8 @@ local function get_mru_files(opts)
   local filtered = {}
   local limit = opts.limit or 5
   local cwd = vim.fn.getcwd()
+  local cwd_only = opts.cwd_only ~= false
+  local seen = {}
 
   for _, filepath in ipairs(oldfiles) do
     if #filtered >= limit then
@@ -17,26 +19,28 @@ local function get_mru_files(opts)
     end
 
     if type(filepath) == "string" and filepath ~= "" then
-      if utils.is_readable(filepath) then
+      local abs_path = vim.fs.normalize(vim.fn.fnamemodify(filepath, ":p"))
+      if not seen[abs_path] and utils.is_readable(abs_path) then
         local skip = false
 
         if opts.ignore then
           for _, pattern in ipairs(opts.ignore) do
-            if filepath:find(pattern) then
+            if filepath:find(pattern) or abs_path:find(pattern) then
               skip = true
               break
             end
           end
         end
 
-        if not skip and opts.cwd_only then
-          if not filepath:find(cwd, 1, true) then
+        if not skip and cwd_only then
+          if not utils.is_under_dir(abs_path, cwd) then
             skip = true
           end
         end
 
         if not skip then
-          table.insert(filtered, filepath)
+          seen[abs_path] = true
+          table.insert(filtered, abs_path)
         end
       end
     end

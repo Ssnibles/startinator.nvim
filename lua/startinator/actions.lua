@@ -42,21 +42,42 @@ end
 
 --- Find recent files using the best available picker or native fallback
 function M.recent_files()
+  local config = require("startinator.config")
+  local cwd_only = config.options and config.options.mru and config.options.mru.cwd_only ~= false
+
   -- 1. Snacks.picker
   if pcall(require, "snacks") and _G.Snacks and _G.Snacks.picker then
-    return safe_call(function() _G.Snacks.picker.recent() end)
+    return safe_call(function()
+      if cwd_only then
+        _G.Snacks.picker.recent({ filter = { cwd = true } })
+      else
+        _G.Snacks.picker.recent()
+      end
+    end)
   end
 
   -- 2. fzf-lua
   local ok_fzf, fzf = pcall(require, "fzf-lua")
   if ok_fzf then
-    return safe_call(function() fzf.oldfiles() end)
+    return safe_call(function()
+      if cwd_only then
+        fzf.oldfiles({ cwd_only = true })
+      else
+        fzf.oldfiles()
+      end
+    end)
   end
 
   -- 3. Telescope
   local ok_tele, builtin = pcall(require, "telescope.builtin")
   if ok_tele then
-    return safe_call(function() builtin.oldfiles() end)
+    return safe_call(function()
+      if cwd_only then
+        builtin.oldfiles({ cwd_only = true })
+      else
+        builtin.oldfiles()
+      end
+    end)
   end
 
   -- 4. mini.pick
@@ -142,6 +163,27 @@ function M.quit(buf)
   end
 end
 
+--- Open file explorer using oil.toggle_float() or fallback
+function M.oil()
+  local ok, oil = pcall(require, "oil")
+  if ok and type(oil.toggle_float) == "function" then
+    return safe_call(function() oil.toggle_float() end)
+  end
+  if ok and type(oil.open_float) == "function" then
+    return safe_call(function() oil.open_float() end)
+  end
+  if ok and type(oil.open) == "function" then
+    return safe_call(function() oil.open() end)
+  end
+  safe_call(function()
+    if vim.fn.exists(":Oil") == 2 then
+      vim.cmd("Oil --float")
+    else
+      vim.notify("startinator: oil.nvim is not available", vim.log.levels.WARN)
+    end
+  end)
+end
+
 --- Execute an action (named string, Vim command string, or Lua function)
 --- @param act string|function
 --- @param buf number|nil
@@ -166,6 +208,8 @@ function M.execute(act, buf)
       M.new_file()
     elseif act == "config" then
       M.config()
+    elseif act == "oil" or act == "explorer" or act:find("oil%.toggle_float") then
+      M.oil()
     elseif act == "quit" then
       M.quit(buf)
     else

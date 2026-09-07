@@ -11,6 +11,45 @@ function M.is_readable(path)
   return stat ~= nil and stat.type == "file"
 end
 
+--- Check if a filepath is located within a directory
+--- @param filepath string
+--- @param dir string|nil
+--- @return boolean
+function M.is_under_dir(filepath, dir)
+  if not filepath or filepath == "" then
+    return false
+  end
+  dir = dir or vim.fn.getcwd()
+  local norm_dir = vim.fs.normalize(dir)
+  if not norm_dir:match("/$") then
+    norm_dir = norm_dir .. "/"
+  end
+  local norm_file = vim.fs.normalize(vim.fn.fnamemodify(filepath, ":p"))
+  if norm_file:sub(1, #norm_dir) == norm_dir then
+    return true
+  end
+
+  local real_dir = vim.uv.fs_realpath(dir)
+  local real_file = vim.uv.fs_realpath(filepath)
+  if real_dir and real_file then
+    real_dir = vim.fs.normalize(real_dir)
+    if not real_dir:match("/$") then
+      real_dir = real_dir .. "/"
+    end
+    real_file = vim.fs.normalize(real_file)
+    if real_file:sub(1, #real_dir) == real_dir then
+      return true
+    end
+  end
+
+  local rel = vim.fs.relpath(dir, filepath)
+  if rel and not rel:match("^%.%.") and not rel:match("^/") then
+    return true
+  end
+
+  return false
+end
+
 --- Format path into clean filename and directory components
 --- @param filepath string
 --- @param cwd string|nil

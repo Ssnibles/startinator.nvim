@@ -32,6 +32,7 @@ M.defaults = {
 		title = "Actions", -- Section title divider
 		items = {
 			{ key = "f", icon = "󰈞", desc = "Find file", action = "find_files" },
+			{ key = "e", icon = "󰉓", desc = "File explorer", action = "oil" },
 			{ key = "n", icon = "󰝒", desc = "New file", action = "new_file" },
 			{ key = "g", icon = "󰊢", desc = "Live grep", action = "live_grep" },
 			{ key = "q", icon = "󰅚", desc = "Quit", action = "quit" },
@@ -43,7 +44,7 @@ M.defaults = {
 		enabled = true,
 		title = "Recent", -- Section title divider
 		limit = 5, -- Maximum number of recent files to show
-		cwd_only = false, -- Only show files within current working directory
+		cwd_only = true, -- Only show files within current working directory
 		show_icons = true, -- Show file type icons
 		ignore = {
 			"%.git/",
@@ -65,6 +66,7 @@ M.defaults = {
 		next = { "j", "<Down>", "<Tab>" },
 		prev = { "k", "<Up>", "<S-Tab>" },
 		select = { "<CR>", "<Space>", "l" },
+		oil = { "e" },
 		new_file = { "i", "a", "o" },
 		quit = { "q", "<Esc>" },
 		mouse = "<LeftMouse>",
@@ -107,6 +109,9 @@ function M.setup(opts)
 		end
 		if user_opts.keymaps.mouse_click and not user_opts.keymaps.mouse then
 			user_opts.keymaps.mouse = user_opts.keymaps.mouse_click
+		end
+		if user_opts.keymaps.explorer and not user_opts.keymaps.oil then
+			user_opts.keymaps.oil = user_opts.keymaps.explorer
 		end
 	end
 
