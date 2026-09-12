@@ -1,11 +1,13 @@
 local actions = require("startinator.actions")
+local render = require("startinator.render")
 
 local M = {}
 
 --- Move cursor to next or previous interactive item with wrap-around
 ---@param buf number
 ---@param dir number (1 for next, -1 for prev)
-local function move_cursor(buf, dir)
+---@param config table
+local function move_cursor(buf, dir, config)
   local items = vim.b[buf].startinator_items or {}
   if #items == 0 then
     return
@@ -34,6 +36,7 @@ local function move_cursor(buf, dir)
 
   if target then
     pcall(vim.api.nvim_win_set_cursor, 0, { target.buf_line, target.col or 2 })
+    render.update_active(buf, 0, config)
   end
 end
 
@@ -50,13 +53,15 @@ end
 
 --- Handle mouse click positioning and activation
 ---@param buf number
-local function handle_mouse_click(buf)
+---@param config table
+local function handle_mouse_click(buf, config)
   local mouse = vim.fn.getmousepos()
   if mouse.winid == vim.api.nvim_get_current_win() then
     local map = vim.b[buf].startinator_line_map or {}
     local item = map[mouse.line]
     if item then
       pcall(vim.api.nvim_win_set_cursor, 0, { item.buf_line, item.col or 2 })
+      render.update_active(buf, 0, config)
       actions.execute(item.action, buf)
     end
   end
@@ -77,8 +82,8 @@ function M.setup(buf, config)
   end
 
   local mappings = {
-    { keys = km.next or { "j", "<Down>", "<Tab>" }, fn = function() move_cursor(buf, 1) end },
-    { keys = km.prev or { "k", "<Up>", "<S-Tab>" }, fn = function() move_cursor(buf, -1) end },
+    { keys = km.next or { "j", "<Down>", "<Tab>" }, fn = function() move_cursor(buf, 1, config) end },
+    { keys = km.prev or { "k", "<Up>", "<S-Tab>" }, fn = function() move_cursor(buf, -1, config) end },
     { keys = km.select or { "<CR>", "<Space>", "l" }, fn = function() select_current_item(buf) end },
     { keys = { "h", "<Left>" }, fn = "<Nop>" },
     { keys = km.oil or km.explorer or { "e" }, fn = actions.oil },
@@ -95,7 +100,7 @@ function M.setup(buf, config)
   local mouse_key = km.mouse or "<LeftMouse>"
   if mouse_key and mouse_key ~= "" then
     vim.keymap.set("n", mouse_key, function()
-      handle_mouse_click(buf)
+      handle_mouse_click(buf, config)
     end, opts)
   end
 

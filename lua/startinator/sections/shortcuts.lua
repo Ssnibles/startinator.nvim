@@ -14,6 +14,7 @@ function M.render(config)
   local lines = {}
   local items = {}
   local width = config._resolved_width or config.width or 46
+  local sel_str, sel_hl = utils.get_selector(config)
 
   -- Section divider
   if opts.title and opts.title ~= "" then
@@ -35,10 +36,15 @@ function M.render(config)
       icon_str = (item.icon and item.icon ~= "") and (item.icon .. "  ") or "    "
     end
 
-    local left = {
-      { icon_str, "StartinatorShortcutIcon" },
-      { item.desc or "", "StartinatorShortcutDesc" },
-    }
+    local left = {}
+    if sel_str ~= "" then
+      table.insert(left, { sel_str, sel_hl })
+    end
+    if icon_str ~= "" then
+      table.insert(left, { icon_str, "StartinatorShortcutIcon" })
+    end
+    table.insert(left, { item.desc or "", "StartinatorShortcutDesc" })
+
     local right = {
       { item.key or "", "StartinatorShortcutKey" },
     }

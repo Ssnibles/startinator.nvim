@@ -80,6 +80,48 @@ local function get_section_module(sec)
   return nil
 end
 
+--- Update active item selector highlight and optional symbol overlay
+---@param buf number
+---@param win number
+---@param config table
+function M.update_active(buf, win, config)
+  if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_win_is_valid(win) then
+    return
+  end
+  local ns = vim.api.nvim_create_namespace("startinator_active")
+  vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+
+  local cur_line = vim.api.nvim_win_get_cursor(win)[1]
+  local map = vim.b[buf].startinator_line_map or {}
+  local item = map[cur_line]
+  if not item then
+    return
+  end
+
+  local sel = config and config.selector
+  if sel and sel.enabled == false then
+    return
+  end
+
+  local bullet = (sel and sel.bullet) or "░ "
+  local bullet_len = #bullet
+  local active_bullet = sel and sel.active
+
+  if active_bullet and active_bullet ~= "" then
+    pcall(vim.api.nvim_buf_set_extmark, buf, ns, cur_line - 1, item.col, {
+      virt_text = { { active_bullet, "StartinatorSelectorActive" } },
+      virt_text_pos = "overlay",
+      priority = 100,
+    })
+  else
+    pcall(vim.api.nvim_buf_set_extmark, buf, ns, cur_line - 1, item.col, {
+      end_col = item.col + bullet_len,
+      hl_group = "StartinatorSelectorActive",
+      priority = 100,
+    })
+  end
+end
+
 --- Render all configured sections and draw to the dashboard buffer
 ---@param buf number
 ---@param win number
@@ -231,9 +273,10 @@ function M.draw(buf, win, config)
   vim.b[buf].startinator_items = mapped_items
   vim.b[buf].startinator_line_map = items_by_line
 
-  -- 8. Position cursor on first interactive item
+  -- 8. Position cursor on first interactive item and highlight active selector
   if #mapped_items > 0 then
     pcall(vim.api.nvim_win_set_cursor, win, { mapped_items[1].buf_line, mapped_items[1].col })
+    M.update_active(buf, win, config)
   end
 end
 

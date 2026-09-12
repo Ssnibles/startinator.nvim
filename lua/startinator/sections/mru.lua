@@ -67,6 +67,8 @@ function M.render(config)
   local cwd = vim.fn.getcwd()
   local home = os.getenv("HOME")
   local show_icons = opts.show_icons ~= false and config.show_icons ~= false
+  local sel_str, sel_hl = utils.get_selector(config)
+  local sel_w = vim.fn.strdisplaywidth(sel_str)
 
   -- Section divider
   if opts.title and opts.title ~= "" then
@@ -108,7 +110,7 @@ function M.render(config)
       dir_str = (d == "~" or d == ".") and "~/" or (d .. "/")
     end
 
-    local avail_w = width - icon_w - key_w - 2
+    local avail_w = width - sel_w - icon_w - key_w - 2
     local name_w = vim.fn.strdisplaywidth(name)
     local dir_w = vim.fn.strdisplaywidth(dir_str)
 
@@ -129,6 +131,9 @@ function M.render(config)
     end
 
     local left = {}
+    if sel_str ~= "" then
+      table.insert(left, { sel_str, sel_hl })
+    end
     if icon_str ~= "" then
       table.insert(left, { icon_str, icon_hl })
     end

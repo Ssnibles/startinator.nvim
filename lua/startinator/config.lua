@@ -8,6 +8,15 @@ M.defaults = {
   margin = 4, -- Left margin when align = "left"
   padding_top = 0, -- Minimum top padding (0 allows vertical centering)
 
+  -- Window options
+  cursorline = false, -- Disable horizontal cursorline bar (mini.starter style)
+
+  -- Item selector bullet on the left of interactive items
+  selector = {
+    enabled = true,
+    bullet = "░ ", -- Symbol on the left of each selectable item
+    active = nil,  -- Optional symbol when item is active/selected (e.g. "█ " or nil to keep bullet)
+  },
 
   -- Automatically open dashboard on Neovim startup if buffer is empty
   auto_open = true,
@@ -80,6 +89,8 @@ M.defaults = {
     Cwd = { link = "Comment" },
     SectionTitle = { link = "Special" },
     SectionRule = { link = "Comment" },
+    Selector = { link = "Delimiter" },
+    SelectorActive = { link = "Special" },
     ShortcutKey = { link = "Number" },
     ShortcutIcon = { link = "Special" },
     ShortcutDesc = { link = "Normal" },

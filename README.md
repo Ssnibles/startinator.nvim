@@ -40,6 +40,15 @@ require("startinator").setup({
   margin = 4,      -- Left margin when align = "left"
   padding_top = 0, -- Minimum top padding (0 centers vertically)
 
+  -- Window options
+  cursorline = false, -- Disable horizontal cursorline bar (mini.starter style)
+
+  -- Item selector bullet on the left of interactive items
+  selector = {
+    enabled = true,
+    bullet = "░ ", -- Symbol on the left of each selectable item
+    active = nil,  -- Optional symbol when item is active/selected (e.g. "█ " or nil to keep bullet)
+  },
 
   -- Open on startup when Neovim starts with an empty buffer
   auto_open = true,
@@ -112,6 +121,8 @@ require("startinator").setup({
     Cwd = { link = "Comment" },
     SectionTitle = { link = "Special" },
     SectionRule = { link = "Comment" },
+    Selector = { link = "Delimiter" },
+    SelectorActive = { link = "Special" },
     ShortcutKey = { link = "Number" },
     ShortcutIcon = { link = "Special" },
     ShortcutDesc = { link = "Normal" },

@@ -76,6 +76,18 @@ function M.get_file_icon(filepath, show_icons)
   return "󰈔", "StartinatorMruIcon"
 end
 
+--- Get selector bullet string and highlight group if enabled
+---@param config table
+---@return string bullet, string hl_group
+function M.get_selector(config)
+  local sel = config and config.selector
+  if sel and sel.enabled == false then
+    return "", ""
+  end
+  local bullet = (sel and sel.bullet) or "░ "
+  return bullet, "StartinatorSelector"
+end
+
 --- Generate a standardized section divider line
 ---@param title string
 ---@param width number
