@@ -64,7 +64,7 @@ require("startinator").setup({
   -- Header settings
   header = {
     enabled = true,
-    title = "  N E O V I M", -- Title string or table of strings for ASCII art
+    title = "  E O V I M", -- Title string or table of strings for ASCII art
     cwd = true,                 -- Show current working directory below title
     greeting = false,           -- Time-of-day greeting
   },
@@ -143,16 +143,16 @@ require("startinator").setup({
 
 ## Keybindings
 
-| Key | Action |
-| :--- | :--- |
-| `j` / `<Down>` / `<Tab>` | Move to next item (wraps) |
-| `k` / `<Up>` / `<S-Tab>` | Move to previous item (wraps) |
-| `<CR>` / `<Space>` / `l` | Open item under cursor |
-| `f`, `e`, `n`, `g`, `q` | Run action shortcut (`e` runs `oil.toggle_float()`) |
-| `1` – `9` | Open recent file by index |
-| `i` / `a` / `o` | Create a new buffer and enter insert mode |
-| `q` / `<Esc>` | Close dashboard or quit Neovim |
-| `<LeftMouse>` | Activate clicked item |
+| Key                      | Action                                              |
+| :----------------------- | :-------------------------------------------------- |
+| `j` / `<Down>` / `<Tab>` | Move to next item (wraps)                           |
+| `k` / `<Up>` / `<S-Tab>` | Move to previous item (wraps)                       |
+| `<CR>` / `<Space>` / `l` | Open item under cursor                              |
+| `f`, `e`, `n`, `g`, `q`  | Run action shortcut (`e` runs `oil.toggle_float()`) |
+| `1` – `9`                | Open recent file by index                           |
+| `i` / `a` / `o`          | Create a new buffer and enter insert mode           |
+| `q` / `<Esc>`            | Close dashboard or quit Neovim                      |
+| `<LeftMouse>`            | Activate clicked item                               |
 
 ## Custom Sections
 
