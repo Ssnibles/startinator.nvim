@@ -1,93 +1,53 @@
 local M = {}
 
---- Fast check if a file exists and is readable using libuv
---- @param path string
---- @return boolean
+local uv = vim.uv or vim.loop
+
+--- Fast check if a file exists and is readable
+---@param path string
+---@return boolean
 function M.is_readable(path)
   if not path or path == "" then
     return false
   end
-  local stat = vim.uv.fs_stat(path)
+  local stat = uv.fs_stat(path)
   return stat ~= nil and stat.type == "file"
 end
 
 --- Check if a filepath is located within a directory
---- @param filepath string
---- @param dir string|nil
---- @return boolean
+---@param filepath string
+---@param dir string|nil
+---@return boolean
 function M.is_under_dir(filepath, dir)
   if not filepath or filepath == "" then
     return false
   end
   dir = dir or vim.fn.getcwd()
-  local norm_dir = vim.fs.normalize(dir)
-  if not norm_dir:match("/$") then
-    norm_dir = norm_dir .. "/"
-  end
-  local norm_file = vim.fs.normalize(vim.fn.fnamemodify(filepath, ":p"))
-  if norm_file:sub(1, #norm_dir) == norm_dir then
-    return true
-  end
-
-  local real_dir = vim.uv.fs_realpath(dir)
-  local real_file = vim.uv.fs_realpath(filepath)
-  if real_dir and real_file then
-    real_dir = vim.fs.normalize(real_dir)
-    if not real_dir:match("/$") then
-      real_dir = real_dir .. "/"
-    end
-    real_file = vim.fs.normalize(real_file)
-    if real_file:sub(1, #real_dir) == real_dir then
-      return true
-    end
-  end
-
   local rel = vim.fs.relpath(dir, filepath)
-  if rel and not rel:match("^%.%.") and not rel:match("^/") then
-    return true
-  end
-
-  return false
+  return rel ~= nil and not rel:match("^%.%.") and not rel:match("^/")
 end
 
---- Format path into clean filename and directory components
---- @param filepath string
---- @param cwd string|nil
---- @return string filename, string dir
-function M.split_path(filepath, cwd)
-  cwd = cwd or vim.fn.getcwd()
-
-  -- Check if file is inside current working directory
-  local rel = vim.fs.relpath(cwd, filepath)
-  if rel then
-    local dir = vim.fs.dirname(rel)
-    local name = vim.fs.basename(rel)
-    if dir == "." then
-      return name, "./"
-    else
-      return name, dir .. "/"
+--- Truncate string to max display width with an ellipsis
+---@param str string
+---@param max_w number
+---@return string
+function M.truncate(str, max_w)
+  if vim.fn.strdisplaywidth(str) <= max_w or max_w < 4 then
+    return str
+  end
+  local chars = vim.fn.strchars(str)
+  for i = chars, 1, -1 do
+    local sub = vim.fn.strcharpart(str, 0, i) .. "…"
+    if vim.fn.strdisplaywidth(sub) <= max_w then
+      return sub
     end
   end
-
-  -- File is outside cwd: shorten HOME to ~
-  local home = os.getenv("HOME")
-  local display_path = filepath
-  if home and filepath:sub(1, #home) == home then
-    display_path = "~" .. filepath:sub(#home + 1)
-  end
-
-  local dir = vim.fs.dirname(display_path)
-  local name = vim.fs.basename(display_path)
-  if dir == "." or dir == "~" then
-    return name, dir .. "/"
-  end
-  return name, dir .. "/"
+  return "…"
 end
 
 --- Get icon and highlight group for a file
---- @param filepath string
---- @param show_icons boolean|nil
---- @return string icon, string hl_group
+---@param filepath string
+---@param show_icons boolean|nil
+---@return string icon, string hl_group
 function M.get_file_icon(filepath, show_icons)
   if show_icons == false then
     return "", ""
@@ -113,22 +73,64 @@ function M.get_file_icon(filepath, show_icons)
     end
   end
 
-  -- Fallback icon
   return "󰈔", "StartinatorMruIcon"
 end
 
+--- Generate a standardized section divider line
+---@param title string
+---@param width number
+---@return table chunks Array of { text, hl }
+function M.divider(title, width)
+  local prefix = "─ " .. title .. " "
+  local prefix_w = vim.fn.strdisplaywidth(prefix)
+  local rule_w = math.max(2, width - prefix_w)
+  return {
+    { prefix, "StartinatorSectionTitle" },
+    { string.rep("─", rule_w), "StartinatorSectionRule" },
+  }
+end
+
+--- Align left and right chunk lists to fill target width
+---@param left table Array of { text, hl }
+---@param right table Array of { text, hl }
+---@param width number Target block width
+---@return table chunks Combined array of chunks with padding
+function M.align_row(left, right, width)
+  local left_w = 0
+  for _, c in ipairs(left) do
+    left_w = left_w + vim.fn.strdisplaywidth(c[1] or "")
+  end
+
+  local right_w = 0
+  for _, c in ipairs(right) do
+    right_w = right_w + vim.fn.strdisplaywidth(c[1] or "")
+  end
+
+  local pad = math.max(2, width - left_w - right_w)
+  local row = {}
+
+  for _, c in ipairs(left) do
+    table.insert(row, c)
+  end
+  table.insert(row, { string.rep(" ", pad), nil })
+  for _, c in ipairs(right) do
+    table.insert(row, c)
+  end
+
+  return row
+end
+
 --- Setup highlight groups from configuration
---- @param hl_map table
+---@param hl_map table<string, table>
 function M.setup_highlights(hl_map)
   for name, def in pairs(hl_map or {}) do
     local group = name:match("^Startinator") and name or ("Startinator" .. name)
-    local opts = vim.tbl_extend("force", { default = true }, def)
-    vim.api.nvim_set_hl(0, group, opts)
+    vim.api.nvim_set_hl(0, group, vim.tbl_extend("force", { default = true }, def))
   end
 end
 
 --- Get clean time-of-day greeting
---- @return string
+---@return string
 function M.get_greeting()
   local hour = tonumber(os.date("%H"))
   if hour >= 5 and hour < 12 then
@@ -138,17 +140,6 @@ function M.get_greeting()
   else
     return "Good evening"
   end
-end
-
---- Truncate string to max width with ellipsis
---- @param str string
---- @param max_len number
---- @return string
-function M.truncate(str, max_len)
-  if #str > max_len and max_len > 3 then
-    return str:sub(1, max_len - 3) .. "..."
-  end
-  return str
 end
 
 return M

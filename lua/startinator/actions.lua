@@ -1,8 +1,10 @@
 local M = {}
 
+local uv = vim.uv or vim.loop
+
 --- Safe call helper that notifies user on error instead of throwing a traceback
---- @param fn function
---- @return boolean success, any result
+---@param fn function
+---@return boolean success, any result
 local function safe_call(fn)
   local ok, res = pcall(fn)
   if not ok then
@@ -11,119 +13,113 @@ local function safe_call(fn)
   return ok, res
 end
 
---- Find files using the best available picker or native fallback
-function M.find_files()
-  -- 1. Snacks.picker
-  if pcall(require, "snacks") and _G.Snacks and _G.Snacks.picker then
-    return safe_call(function() _G.Snacks.picker.files() end)
-  end
+--- Supported fuzzy pickers in priority order
+local pickers = {
+  {
+    name = "snacks",
+    available = function()
+      return pcall(require, "snacks") and _G.Snacks and _G.Snacks.picker
+    end,
+    files = function()
+      _G.Snacks.picker.files()
+    end,
+    recent = function(cwd_only)
+      _G.Snacks.picker.recent(cwd_only and { filter = { cwd = true } } or nil)
+    end,
+    grep = function()
+      _G.Snacks.picker.grep()
+    end,
+  },
+  {
+    name = "fzf-lua",
+    available = function()
+      local ok, f = pcall(require, "fzf-lua")
+      return ok and f
+    end,
+    files = function(f)
+      f.files()
+    end,
+    recent = function(f, cwd_only)
+      f.oldfiles({ cwd_only = cwd_only })
+    end,
+    grep = function(f)
+      f.live_grep()
+    end,
+  },
+  {
+    name = "telescope",
+    available = function()
+      local ok, t = pcall(require, "telescope.builtin")
+      return ok and t
+    end,
+    files = function(t)
+      t.find_files()
+    end,
+    recent = function(t, cwd_only)
+      t.oldfiles({ cwd_only = cwd_only })
+    end,
+    grep = function(t)
+      t.live_grep()
+    end,
+  },
+  {
+    name = "mini.pick",
+    available = function()
+      local ok, m = pcall(require, "mini.pick")
+      return ok and m.builtin and m
+    end,
+    files = function(m)
+      m.builtin.files()
+    end,
+    recent = function(m)
+      m.builtin.cli({ command = { "git", "status" } })
+    end,
+    grep = function(m)
+      m.builtin.grep_live()
+    end,
+  },
+}
 
-  -- 2. fzf-lua
-  local ok_fzf, fzf = pcall(require, "fzf-lua")
-  if ok_fzf then
-    return safe_call(function() fzf.files() end)
+--- Run a picker method if an integrated picker is found, otherwise run fallback
+---@param method string "files"|"recent"|"grep"
+---@param arg any
+---@param fallback function
+local function run_picker(method, arg, fallback)
+  for _, p in ipairs(pickers) do
+    local handle = p.available()
+    if handle and p[method] then
+      return safe_call(function()
+        p[method](handle, arg)
+      end)
+    end
   end
-
-  -- 3. Telescope
-  local ok_tele, builtin = pcall(require, "telescope.builtin")
-  if ok_tele then
-    return safe_call(function() builtin.find_files() end)
-  end
-
-  -- 4. mini.pick
-  local ok_mini, mini_pick = pcall(require, "mini.pick")
-  if ok_mini and mini_pick.builtin and mini_pick.builtin.files then
-    return safe_call(function() mini_pick.builtin.files() end)
-  end
-
-  -- 5. Native fallback: open file explorer / netrw
-  safe_call(function() vim.cmd("edit .") end)
+  safe_call(fallback)
 end
 
---- Find recent files using the best available picker or native fallback
+--- Find files using the best available picker or netrw fallback
+function M.find_files()
+  run_picker("files", nil, function()
+    vim.cmd("edit .")
+  end)
+end
+
+--- Find recent files using the best available picker or browse oldfiles fallback
 function M.recent_files()
   local config = require("startinator.config")
   local cwd_only = config.options and config.options.mru and config.options.mru.cwd_only ~= false
-
-  -- 1. Snacks.picker
-  if pcall(require, "snacks") and _G.Snacks and _G.Snacks.picker then
-    return safe_call(function()
-      if cwd_only then
-        _G.Snacks.picker.recent({ filter = { cwd = true } })
-      else
-        _G.Snacks.picker.recent()
-      end
-    end)
-  end
-
-  -- 2. fzf-lua
-  local ok_fzf, fzf = pcall(require, "fzf-lua")
-  if ok_fzf then
-    return safe_call(function()
-      if cwd_only then
-        fzf.oldfiles({ cwd_only = true })
-      else
-        fzf.oldfiles()
-      end
-    end)
-  end
-
-  -- 3. Telescope
-  local ok_tele, builtin = pcall(require, "telescope.builtin")
-  if ok_tele then
-    return safe_call(function()
-      if cwd_only then
-        builtin.oldfiles({ cwd_only = true })
-      else
-        builtin.oldfiles()
-      end
-    end)
-  end
-
-  -- 4. mini.pick
-  local ok_mini, mini_pick = pcall(require, "mini.pick")
-  if ok_mini and mini_pick.builtin and mini_pick.builtin.cli then
-    return safe_call(function()
-      mini_pick.builtin.cli({ command = { "git", "status" } })
-    end)
-  end
-
-  -- 5. Native fallback: browse oldfiles
-  safe_call(function() vim.cmd("browse oldfiles") end)
+  run_picker("recent", cwd_only, function()
+    vim.cmd("browse oldfiles")
+  end)
 end
 
---- Live grep using the best available picker or native fallback
+--- Live grep using the best available picker or vimgrep fallback
 function M.live_grep()
-  -- 1. Snacks.picker
-  if pcall(require, "snacks") and _G.Snacks and _G.Snacks.picker then
-    return safe_call(function() _G.Snacks.picker.grep() end)
-  end
-
-  -- 2. fzf-lua
-  local ok_fzf, fzf = pcall(require, "fzf-lua")
-  if ok_fzf then
-    return safe_call(function() fzf.live_grep() end)
-  end
-
-  -- 3. Telescope
-  local ok_tele, builtin = pcall(require, "telescope.builtin")
-  if ok_tele then
-    return safe_call(function() builtin.live_grep() end)
-  end
-
-  -- 4. mini.pick
-  local ok_mini, mini_pick = pcall(require, "mini.pick")
-  if ok_mini and mini_pick.builtin and mini_pick.builtin.grep_live then
-    return safe_call(function() mini_pick.builtin.grep_live() end)
-  end
-
-  -- 5. Native fallback: vimgrep prompt
-  local pattern = vim.fn.input("Live Grep > ")
-  if pattern and pattern ~= "" then
-    safe_call(function()
+  run_picker("grep", nil, function()
+    local pattern = vim.fn.input("Live Grep > ")
+    if pattern and pattern ~= "" then
       vim.cmd("silent grep! " .. vim.fn.fnameescape(pattern) .. " | copen")
-    end)
-  end
+    end
+  end)
 end
 
 --- Create and edit a new unnamed buffer, entering insert mode immediately
@@ -134,16 +130,30 @@ end
 
 --- Open Neovim configuration file
 function M.config()
-  local config_file = vim.fn.stdpath("config") .. "/init.lua"
-  if vim.uv.fs_stat(config_file) then
-    vim.cmd("edit " .. vim.fn.fnameescape(config_file))
-  else
-    vim.cmd("edit $MYVIMRC")
-  end
+  local file = vim.fn.stdpath("config") .. "/init.lua"
+  local target = (uv.fs_stat(file) and file) or vim.fn.expand("$MYVIMRC")
+  vim.cmd("edit " .. vim.fn.fnameescape(target))
 end
 
---- Smart quit: if startinator is the only buffer, exit Neovim; otherwise close startinator
---- @param buf number|nil
+--- Open file explorer using oil.nvim or warning fallback
+function M.oil()
+  local ok, oil = pcall(require, "oil")
+  if ok then
+    local fn = oil.toggle_float or oil.open_float or oil.open
+    if fn then
+      return safe_call(fn)
+    end
+  end
+  if vim.fn.exists(":Oil") == 2 then
+    return safe_call(function()
+      vim.cmd("Oil --float")
+    end)
+  end
+  vim.notify("startinator: oil.nvim is not available", vim.log.levels.WARN)
+end
+
+--- Smart quit: exit Neovim if startinator is the only buffer, otherwise close dashboard buffer
+---@param buf number|nil
 function M.quit(buf)
   local valid_buffers = 0
   for _, b in ipairs(vim.api.nvim_list_bufs()) do
@@ -154,7 +164,7 @@ function M.quit(buf)
 
   if valid_buffers > 0 then
     if buf and vim.api.nvim_buf_is_valid(buf) then
-      vim.api.nvim_buf_delete(buf, { force = true })
+      pcall(vim.api.nvim_buf_delete, buf, { force = true })
     else
       vim.cmd("silent! bdelete!")
     end
@@ -163,58 +173,46 @@ function M.quit(buf)
   end
 end
 
---- Open file explorer using oil.toggle_float() or fallback
-function M.oil()
-  local ok, oil = pcall(require, "oil")
-  if ok and type(oil.toggle_float) == "function" then
-    return safe_call(function() oil.toggle_float() end)
-  end
-  if ok and type(oil.open_float) == "function" then
-    return safe_call(function() oil.open_float() end)
-  end
-  if ok and type(oil.open) == "function" then
-    return safe_call(function() oil.open() end)
-  end
-  safe_call(function()
-    if vim.fn.exists(":Oil") == 2 then
-      vim.cmd("Oil --float")
-    else
-      vim.notify("startinator: oil.nvim is not available", vim.log.levels.WARN)
-    end
-  end)
+--- Action registry mapping action names to handlers
+M.registry = {
+  find_files = M.find_files,
+  recent_files = M.recent_files,
+  live_grep = M.live_grep,
+  new_file = M.new_file,
+  config = M.config,
+  oil = M.oil,
+  explorer = M.oil,
+  quit = M.quit,
+}
+
+--- Register a custom action by name
+---@param name string
+---@param fn function
+function M.register(name, fn)
+  M.registry[name] = fn
 end
 
---- Execute an action (named string, Vim command string, or Lua function)
---- @param act string|function
---- @param buf number|nil
+--- Execute an action (function, registered string name, or Vim Ex command)
+---@param act string|function
+---@param buf number|nil
 function M.execute(act, buf)
   if not act then
     return
   end
-
   if type(act) == "function" then
-    safe_call(act)
-    return
+    return safe_call(act)
   end
-
   if type(act) == "string" then
-    if act == "find_files" then
-      M.find_files()
-    elseif act == "recent_files" then
-      M.recent_files()
-    elseif act == "live_grep" then
-      M.live_grep()
-    elseif act == "new_file" then
-      M.new_file()
-    elseif act == "config" then
-      M.config()
-    elseif act == "oil" or act == "explorer" or act:find("oil%.toggle_float") then
-      M.oil()
-    elseif act == "quit" then
-      M.quit(buf)
-    else
-      safe_call(function() vim.cmd(act) end)
+    local handler = M.registry[act]
+    if handler then
+      return safe_call(function()
+        handler(buf)
+      end)
     end
+    -- Fallback: execute as Vim command
+    safe_call(function()
+      vim.cmd(act)
+    end)
   end
 end
 

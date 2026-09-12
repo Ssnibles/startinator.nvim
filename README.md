@@ -40,6 +40,7 @@ require("startinator").setup({
   margin = 4,      -- Left margin when align = "left"
   padding_top = 0, -- Minimum top padding (0 centers vertically)
 
+
   -- Open on startup when Neovim starts with an empty buffer
   auto_open = true,
 
@@ -189,6 +190,34 @@ local project_section = {
     }
   end,
 }
+```
+
+You can also register named sections or actions globally:
+
+```lua
+local startinator = require("startinator")
+local utils = require("startinator.utils")
+
+-- Register a custom named section
+startinator.register_section("bookmarks", function(config)
+  local width = config._resolved_width or config.width or 46
+  local lines = { utils.divider("Bookmarks", width) }
+  local left = { { "󰃀  ", "StartinatorShortcutIcon" }, { "Dotfiles", "StartinatorShortcutDesc" } }
+  local right = { { "d", "StartinatorShortcutKey" } }
+  table.insert(lines, utils.align_row(left, right, width))
+
+  return {
+    lines = lines,
+    items = {
+      { line_idx = 2, key = "d", action = "edit ~/.config/nvim" },
+    },
+  }
+end)
+
+-- Register a custom named action
+startinator.register_action("open_docs", function()
+  vim.cmd("help")
+end)
 ```
 
 ## License

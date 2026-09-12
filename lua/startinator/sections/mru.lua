@@ -2,9 +2,9 @@ local utils = require("startinator.utils")
 
 local M = {}
 
---- Filter v:oldfiles according to config
---- @param opts table
---- @return table list of valid filepaths
+--- Filter v:oldfiles according to configuration
+---@param opts table
+---@return table list of valid file paths
 local function get_mru_files(opts)
   local oldfiles = vim.v.oldfiles or {}
   local filtered = {}
@@ -32,10 +32,8 @@ local function get_mru_files(opts)
           end
         end
 
-        if not skip and cwd_only then
-          if not utils.is_under_dir(abs_path, cwd) then
-            skip = true
-          end
+        if not skip and cwd_only and not utils.is_under_dir(abs_path, cwd) then
+          skip = true
         end
 
         if not skip then
@@ -49,9 +47,9 @@ local function get_mru_files(opts)
   return filtered
 end
 
---- Render MRU section with single path and highlighted filename
---- @param config table
---- @return table
+--- Render MRU section
+---@param config table
+---@return table
 function M.render(config)
   local opts = config.mru
   if not opts or not opts.enabled then
@@ -65,22 +63,14 @@ function M.render(config)
 
   local lines = {}
   local items = {}
-  local block_width = config._resolved_width or config.width or 46
+  local width = config._resolved_width or config.width or 46
   local cwd = vim.fn.getcwd()
   local home = os.getenv("HOME")
   local show_icons = opts.show_icons ~= false and config.show_icons ~= false
 
-  -- Section Header Divider: ─ Recent ──────────────────────────
+  -- Section divider
   if opts.title and opts.title ~= "" then
-    local title_prefix = "─ " .. opts.title .. " "
-    local title_w = vim.fn.strdisplaywidth(title_prefix)
-    local rule_w = math.max(2, block_width - title_w)
-    local rule_str = string.rep("─", rule_w)
-
-    table.insert(lines, {
-      { title_prefix, "StartinatorSectionTitle" },
-      { rule_str, "StartinatorSectionRule" },
-    })
+    table.insert(lines, utils.divider(opts.title, width))
   end
 
   for idx, filepath in ipairs(files) do
@@ -101,12 +91,11 @@ function M.render(config)
 
     -- Split path into directory prefix and filename
     local dir_str = ""
-    local name = ""
+    local name = vim.fs.basename(filepath)
 
     local rel = vim.fs.relpath(cwd, filepath)
     if rel and not rel:find("^%.%./") then
       local d = vim.fs.dirname(rel)
-      name = vim.fs.basename(rel)
       if d ~= "." then
         dir_str = d .. "/"
       end
@@ -116,15 +105,10 @@ function M.render(config)
         display = "~" .. filepath:sub(#home + 1)
       end
       local d = vim.fs.dirname(display)
-      name = vim.fs.basename(display)
-      if d == "~" or d == "." then
-        dir_str = "~/"
-      else
-        dir_str = d .. "/"
-      end
+      dir_str = (d == "~" or d == ".") and "~/" or (d .. "/")
     end
 
-    local avail_w = block_width - icon_w - key_w - 2
+    local avail_w = width - icon_w - key_w - 2
     local name_w = vim.fn.strdisplaywidth(name)
     local dir_w = vim.fn.strdisplaywidth(dir_str)
 
@@ -132,48 +116,40 @@ function M.render(config)
     if dir_w + name_w > avail_w then
       local max_dir_w = avail_w - name_w
       if max_dir_w >= 5 then
-        local keep_len = max_dir_w - 2
-        local cut_dir = dir_str:sub(#dir_str - keep_len + 1)
-        local slash = cut_dir:find("/")
-        if slash and slash < #cut_dir - 2 then
-          cut_dir = cut_dir:sub(slash + 1)
-        end
-        dir_str = "…/" .. cut_dir
-        dir_w = vim.fn.strdisplaywidth(dir_str)
+        local keep = max_dir_w - 2
+        local cut = dir_str:sub(#dir_str - keep + 1)
+        local slash = cut:find("/")
+        dir_str = "…/" .. (slash and cut:sub(slash + 1) or cut)
       else
         dir_str = ""
-        dir_w = 0
         if name_w > avail_w then
           name = utils.truncate(name, avail_w)
-          name_w = vim.fn.strdisplaywidth(name)
         end
       end
     end
 
-    local pad_spaces = math.max(2, block_width - icon_w - dir_w - name_w - key_w)
-
-    local line_chunks = {}
+    local left = {}
     if icon_str ~= "" then
-      table.insert(line_chunks, { icon_str, icon_hl })
+      table.insert(left, { icon_str, icon_hl })
     end
     if dir_str ~= "" then
-      table.insert(line_chunks, { dir_str, "StartinatorMruPath" })
+      table.insert(left, { dir_str, "StartinatorMruPath" })
     end
-    table.insert(line_chunks, { name, "StartinatorMruFilename" })
-    table.insert(line_chunks, { string.rep(" ", pad_spaces), nil })
-    table.insert(line_chunks, { key_num, "StartinatorMruIndex" })
+    table.insert(left, { name, "StartinatorMruFilename" })
 
-    table.insert(lines, line_chunks)
+    local right = {
+      { key_num, "StartinatorMruIndex" },
+    }
 
-    local target_path = filepath
+    table.insert(lines, utils.align_row(left, right, width))
     table.insert(items, {
       line_idx = #lines,
       key = key_num,
       action = function()
-        vim.cmd("edit " .. vim.fn.fnameescape(target_path))
+        vim.cmd("edit " .. vim.fn.fnameescape(filepath))
       end,
       type = "mru",
-      path = target_path,
+      path = filepath,
       label = name,
     })
   end
