@@ -64,7 +64,7 @@ require("startinator").setup({
   -- Header settings
   header = {
     enabled = true,
-    title = "  E O V I M", -- Title string or table of strings for ASCII art
+    title = " E O V I M", -- Title string or table of strings for ASCII art
     cwd = true,                 -- Show current working directory below title
     greeting = false,           -- Time-of-day greeting
   },

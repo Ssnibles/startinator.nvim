@@ -32,7 +32,7 @@ M.defaults = {
 	-- Header section
 	header = {
 		enabled = true,
-		title = "  E O V I M", -- Modern title with Neovim icon
+		title = " E O V I M", -- Modern title with Neovim icon
 		cwd = true, -- Show current working directory path below title
 		greeting = false, -- Dynamic greeting
 	},
