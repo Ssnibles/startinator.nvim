@@ -67,6 +67,8 @@ require("startinator").setup({
     title = " E O V I M", -- Title string or table of strings for ASCII art
     cwd = true,                 -- Show current working directory below title
     greeting = false,           -- Time-of-day greeting
+    -- art = { "ASCII", "art" }, -- Optional table of strings rendered verbatim
+    -- show_icons = true,       -- Set false to drop the title/cwd icons
   },
 
   -- Action shortcuts
@@ -109,6 +111,7 @@ require("startinator").setup({
     next = { "j", "<Down>", "<Tab>" },
     prev = { "k", "<Up>", "<S-Tab>" },
     select = { "<CR>", "<Space>", "l" },
+    noop = { "h", "<Left>" }, -- set to {} or false to leave these keys untouched
     oil = { "e" },
     new_file = { "i", "a", "o" },
     quit = { "q", "<Esc>" },
@@ -119,6 +122,7 @@ require("startinator").setup({
   highlights = {
     Header = { link = "Title" },
     Cwd = { link = "Comment" },
+    Greeting = { link = "Comment" },
     SectionTitle = { link = "Special" },
     SectionRule = { link = "Comment" },
     Selector = { link = "Delimiter" },
@@ -152,6 +156,7 @@ require("startinator").setup({
 | `1` – `9`                | Open recent file by index                           |
 | `i` / `a` / `o`          | Create a new buffer and enter insert mode           |
 | `q` / `<Esc>`            | Close dashboard or quit Neovim                      |
+| `h` / `<Left>`           | No-op (configurable via `keymaps.noop`)             |
 | `<LeftMouse>`            | Activate clicked item                               |
 
 ## Custom Sections
@@ -231,6 +236,25 @@ startinator.register_action("open_docs", function()
 end)
 ```
 
+## Health check
+
+Run `:checkhealth startinator` to verify your configuration, the detected
+picker, and companion plugins such as oil.nvim.
+
+## Development
+
+Run the headless test suite with Neovim >= 0.10:
+
+```sh
+nvim --headless -u NONE -l tests/test_startinator.lua
+# or
+./tests/run.sh
+```
+
+The repository ships `.stylua.toml` (formatting), `.luacheckrc` (linting), and
+`.editorconfig` (indentation). CI runs the tests, `luacheck lua plugin tests`,
+and a blocking `stylua --check`.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

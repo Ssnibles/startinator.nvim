@@ -1,0 +1,206 @@
+*startinator.txt*  A minimal startpage for Neovim
+
+==============================================================================
+CONTENTS                                                    *startinator*
+
+  1. Introduction ................................ |startinator-intro|
+  2. Commands .................................... |startinator-commands|
+  3. Configuration ............................... |startinator-config|
+  4. Keymaps ..................................... |startinator-keymaps|
+  5. Actions ..................................... |startinator-actions|
+  6. Custom sections ............................. |startinator-sections|
+  7. API ......................................... |startinator-api|
+  8. Health ...................................... |startinator-health|
+
+==============================================================================
+1. INTRODUCTION                                         *startinator-intro*
+
+startinator.nvim is a minimal startpage/dashboard written in Lua.  It renders a
+configurable set of sections (header, action shortcuts, recent files, footer)
+into a scratch buffer and binds direct hotkeys to open files and run actions.
+
+It detects a fuzzy picker automatically, in this order: snacks.nvim, fzf-lua,
+telescope.nvim, mini.pick.  If none is found, built-in fallbacks are used.
+
+==============================================================================
+2. COMMANDS                                         *startinator-commands*
+
+                                                        *:Startinator*
+:Startinator         Open the dashboard in the current (or a new) buffer.
+
+                                                   *:StartinatorClose*
+:StartinatorClose    Close any open dashboard, regardless of the current
+                     buffer or window.
+
+                                                  *:StartinatorToggle*
+:StartinatorToggle   Close the dashboard if one is open, otherwise open it.
+
+==============================================================================
+3. CONFIGURATION                                    *startinator-config*
+
+                                                     *startinator.setup()*
+require("startinator").setup({ ... })
+
+All options are optional; defaults are shown below.
+
+>lua
+require("startinator").setup({
+  align = "center",   -- "center" or "left"
+  width = 46,         -- target width of the content block
+  margin = 4,         -- left margin when align = "left"
+  padding_top = 0,    -- minimum top padding (0 centers vertically)
+
+  cursorline = false, -- disable the horizontal cursorline bar
+
+  selector = {
+    enabled = true,
+    bullet = "░ ",
+    active = nil,     -- optional symbol for the active item
+  },
+
+  auto_open = true,   -- open on startup when the buffer is empty
+
+  sections = {
+    "header",
+    "shortcuts",
+    "mru",
+    "footer",
+  },
+
+  header = {
+    enabled = true,
+    title = "  E O V I M",
+    -- art = { "ASCII", "art" },
+    cwd = true,
+    greeting = false,
+    -- show_icons = true,
+  },
+
+  shortcuts = {
+    enabled = true,
+    title = "Actions",
+    items = {
+      { key = "f", icon = "󰈞", desc = "Find file", action = "find_files" },
+      { key = "e", icon = "󰉓", desc = "File explorer", action = "oil" },
+      { key = "n", icon = "󰝒", desc = "New file", action = "new_file" },
+      { key = "g", icon = "󰊢", desc = "Live grep", action = "live_grep" },
+      { key = "q", icon = "󰅚", desc = "Quit", action = "quit" },
+    },
+  },
+
+  mru = {
+    enabled = true,
+    title = "Recent",
+    limit = 5,
+    cwd_only = true,
+    show_icons = true,
+    ignore = { "%.git/", "COMMIT_EDITMSG", "MERGE_MSG", "/tmp/", "%.undodir/" },
+  },
+
+  footer = {
+    enabled = true,
+    content = "hints", -- "hints", a string, a table, or a function
+  },
+
+  keymaps = {
+    next = { "j", "<Down>", "<Tab>" },
+    prev = { "k", "<Up>", "<S-Tab>" },
+    select = { "<CR>", "<Space>", "l" },
+    noop = { "h", "<Left>" }, -- set to {} or false to leave those keys alone
+    oil = { "e" },
+    new_file = { "i", "a", "o" },
+    quit = { "q", "<Esc>" },
+    mouse = "<LeftMouse>",
+  },
+
+  highlights = {
+    Header = { link = "Title" },
+    Cwd = { link = "Comment" },
+    Greeting = { link = "Comment" },
+    SectionTitle = { link = "Special" },
+    SectionRule = { link = "Comment" },
+    Selector = { link = "Delimiter" },
+    SelectorActive = { link = "Special" },
+    ShortcutKey = { link = "Number" },
+    ShortcutIcon = { link = "Special" },
+    ShortcutDesc = { link = "Normal" },
+    MruIndex = { link = "Number" },
+    MruIcon = { link = "Normal" },
+    MruFilename = { link = "Directory" },
+    MruPath = { link = "Comment" },
+    Footer = { link = "Comment" },
+  },
+})
+<
+
+==============================================================================
+4. KEYMAPS                                           *startinator-keymaps*
+
+These are the defaults; all are configurable via |startinator-config|.
+
+  j / <Down> / <Tab>     next item (wraps)
+  k / <Up> / <S-Tab>     previous item (wraps)
+  <CR> / <Space> / l     open the item under the cursor
+  f e n g q              shortcut hotkeys (see `shortcuts.items`)
+  1 - 9                  open a recent file by index
+  i / a / o              new buffer, insert mode
+  q / <Esc>              close the dashboard (or quit Neovim)
+  h / <Left>             no-op (configurable via `keymaps.noop`)
+  <LeftMouse>            activate the clicked item
+
+==============================================================================
+5. ACTIONS                                          *startinator-actions*
+
+Built-in action names usable in `shortcuts.items` / section items:
+
+  "find_files"     open a file picker
+  "recent_files"   open a recent-files picker
+  "live_grep"      open a live grep picker
+  "new_file"       create a new buffer and enter insert mode
+  "config"         edit $MYVIMRC
+  "oil"            toggle oil.nvim (alias: "explorer")
+  "quit"           close the dashboard (or quit Neovim)
+
+An `action` may also be a Lua function, or a string not present in the table
+above, in which case it is executed as a Vim command (for example
+`action = "edit ~/.config/nvim"`).
+
+Register a custom action with |startinator.register_action()|.
+
+==============================================================================
+6. CUSTOM SECTIONS                                 *startinator-sections*
+
+A section is a function or a table with a `render(config)` method returning
+`{ lines = ..., items = ... }`.  See the README for examples.
+
+Register a named section with |startinator.register_section()|, then reference
+it by name in `sections`.
+
+==============================================================================
+7. API                                                     *startinator-api*
+
+                                                       *startinator.open()*
+startinator.open()                       Open the dashboard.
+
+                                                      *startinator.close()*
+startinator.close()                      Close open dashboard(s).
+
+                                                     *startinator.toggle()*
+startinator.toggle()                     Toggle the dashboard.
+
+startinator.setup(opts)                  Configure the plugin (see
+                                         |startinator.setup()|).
+
+                                             *startinator.register_action()*
+startinator.register_action(name, fn)    Register a named action.
+
+                                            *startinator.register_section()*
+startinator.register_section(name, r)    Register a named section renderer.
+
+==============================================================================
+8. HEALTH                                               *startinator-health*
+
+Run `:checkhealth startinator` to verify your configuration, the detected
+picker, and the availability of companion plugins such as oil.nvim.
+
+vim:tw=78:ts=8:ft=help:norl:
