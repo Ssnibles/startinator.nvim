@@ -42,7 +42,12 @@ local function normalize_line(line_def)
   end
 
   -- Single chunk: { "text", "hl" }
-  if #line_def == 2 and type(line_def[1]) == "string" and (type(line_def[2]) == "string" or line_def[2] == nil) and line_def.text == nil then
+  if
+    #line_def == 2
+    and type(line_def[1]) == "string"
+    and (type(line_def[2]) == "string" or line_def[2] == nil)
+    and line_def.text == nil
+  then
     return { { line_def[1], resolve_hl(line_def[2]) } }
   end
 
@@ -92,9 +97,12 @@ function M.update_active(buf, win, config)
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
 
   local cur_line = vim.api.nvim_win_get_cursor(win)[1]
+  -- Keys are stored as strings: a sparse integer-keyed table assigned to a
+  -- buffer variable is coerced into a list and padded with truthy userdata
+  -- sentinels, which would make the `type(item)` guard below ineffective.
   local map = vim.b[buf].startinator_line_map or {}
-  local item = map[cur_line]
-  if not item then
+  local item = map[tostring(cur_line)]
+  if type(item) ~= "table" then
     return
   end
 
@@ -131,8 +139,13 @@ function M.draw(buf, win, config)
 
   local win_w = vim.api.nvim_win_get_width(win)
   local target_w = config.width or 46
-  local block_width = math.min(target_w, math.max(20, win_w - 4))
-  config._resolved_width = block_width
+  -- Keep the usual minimum width, but never exceed the window (very narrow
+  -- splits would otherwise overflow).
+  local block_width = math.min(target_w, math.max(20, win_w - 4), win_w)
+  -- Use a per-draw copy so multiple dashboards of different sizes do not
+  -- clobber each other's resolved width via the shared options table.
+  local draw_config = vim.tbl_extend("force", {}, config)
+  draw_config._resolved_width = block_width
 
   local all_lines_chunks = {}
   local legacy_highlights = {}
@@ -143,7 +156,12 @@ function M.draw(buf, win, config)
   for _, sec in ipairs(config.sections or {}) do
     local sec_module = get_section_module(sec)
     if sec_module then
-      local res = sec_module.render(config)
+      local sec_name = type(sec) == "string" and sec or "custom"
+      local ok, res = pcall(sec_module.render, draw_config)
+      if not ok then
+        vim.notify("startinator: error rendering section '" .. sec_name .. "': " .. tostring(res), vim.log.levels.WARN)
+        res = nil
+      end
       if res and res.lines and #res.lines > 0 then
         -- Add single blank line separator between non-empty sections
         if #all_lines_chunks > 0 then
@@ -267,7 +285,7 @@ function M.draw(buf, win, config)
     item.buf_line = actual_line
     item.col = left_pad
     table.insert(mapped_items, item)
-    items_by_line[actual_line] = item
+    items_by_line[tostring(actual_line)] = item
   end
 
   vim.b[buf].startinator_items = mapped_items

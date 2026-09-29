@@ -45,8 +45,8 @@ end
 local function select_current_item(buf)
   local map = vim.b[buf].startinator_line_map or {}
   local cur_line = vim.api.nvim_win_get_cursor(0)[1]
-  local item = map[cur_line]
-  if item then
+  local item = map[tostring(cur_line)]
+  if type(item) == "table" then
     actions.execute(item.action, buf)
   end
 end
@@ -58,8 +58,8 @@ local function handle_mouse_click(buf, config)
   local mouse = vim.fn.getmousepos()
   if mouse.winid == vim.api.nvim_get_current_win() then
     local map = vim.b[buf].startinator_line_map or {}
-    local item = map[mouse.line]
-    if item then
+    local item = map[tostring(mouse.line)]
+    if type(item) == "table" then
       pcall(vim.api.nvim_win_set_cursor, 0, { item.buf_line, item.col or 2 })
       render.update_active(buf, 0, config)
       actions.execute(item.action, buf)
@@ -81,19 +81,44 @@ function M.setup(buf, config)
     return type(val) == "table" and val or {}
   end
 
+  -- `noop` defaults to disabling horizontal movement; set it to {} or false to
+  -- leave those keys untouched.
+  local noop_keys = (km.noop == nil) and { "h", "<Left>" } or km.noop
   local mappings = {
-    { keys = km.next or { "j", "<Down>", "<Tab>" }, fn = function() move_cursor(buf, 1, config) end },
-    { keys = km.prev or { "k", "<Up>", "<S-Tab>" }, fn = function() move_cursor(buf, -1, config) end },
-    { keys = km.select or { "<CR>", "<Space>", "l" }, fn = function() select_current_item(buf) end },
-    { keys = { "h", "<Left>" }, fn = "<Nop>" },
+    {
+      keys = km.next or { "j", "<Down>", "<Tab>" },
+      fn = function()
+        move_cursor(buf, 1, config)
+      end,
+    },
+    {
+      keys = km.prev or { "k", "<Up>", "<S-Tab>" },
+      fn = function()
+        move_cursor(buf, -1, config)
+      end,
+    },
+    {
+      keys = km.select or { "<CR>", "<Space>", "l" },
+      fn = function()
+        select_current_item(buf)
+      end,
+    },
+    { keys = noop_keys, fn = "<Nop>" },
     { keys = km.oil or km.explorer or { "e" }, fn = actions.oil },
     { keys = km.new_file or { "i", "a", "o" }, fn = actions.new_file },
-    { keys = km.quit or { "q", "<Esc>" }, fn = function() actions.quit(buf) end },
+    {
+      keys = km.quit or { "q", "<Esc>" },
+      fn = function()
+        actions.quit(buf)
+      end,
+    },
   }
 
   for _, m in ipairs(mappings) do
-    for _, k in ipairs(to_list(m.keys)) do
-      vim.keymap.set("n", k, m.fn, opts)
+    if m.keys then
+      for _, k in ipairs(to_list(m.keys)) do
+        vim.keymap.set("n", k, m.fn, opts)
+      end
     end
   end
 
@@ -106,16 +131,32 @@ function M.setup(buf, config)
 
   -- Register direct item hotkeys (e.g. 'f', 'e', 'n', '1'..'9')
   local items = vim.b[buf].startinator_items or {}
-  local bound = {}
-
+  -- Only single-character hotkeys are bound, so a multi-character key (e.g.
+  -- `10` for an MRU entry beyond the ninth) cannot shadow the `1` mapping.
+  -- On collisions the first item wins.
+  local hotkeys = {}
   for _, item in ipairs(items) do
-    if item.key and not bound[item.key] then
-      bound[item.key] = true
-      vim.keymap.set("n", item.key, function()
-        actions.execute(item.action, buf)
-      end, opts)
+    if type(item.key) == "string" and vim.fn.strchars(item.key) == 1 and not hotkeys[item.key] then
+      hotkeys[item.key] = item
     end
   end
+
+  -- Unbind hotkeys that existed in a previous render but are gone now (e.g.
+  -- after a resize dropped an MRU entry).
+  for key in pairs(vim.b[buf].startinator_hotkeys or {}) do
+    if not hotkeys[key] then
+      pcall(vim.keymap.del, "n", key, { buffer = buf })
+    end
+  end
+
+  local bound = {}
+  for key, item in pairs(hotkeys) do
+    bound[key] = true
+    vim.keymap.set("n", key, function()
+      actions.execute(item.action, buf)
+    end, opts)
+  end
+  vim.b[buf].startinator_hotkeys = bound
 end
 
 return M
