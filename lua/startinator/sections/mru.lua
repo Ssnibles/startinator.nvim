@@ -119,7 +119,8 @@ function M.render(config)
       local max_dir_w = avail_w - name_w
       if max_dir_w >= 5 then
         local keep = max_dir_w - 2
-        local cut = dir_str:sub(#dir_str - keep + 1)
+        local dir_chars = vim.fn.strchars(dir_str)
+        local cut = vim.fn.strcharpart(dir_str, math.max(0, dir_chars - keep))
         local slash = cut:find("/")
         dir_str = "…/" .. (slash and cut:sub(slash + 1) or cut)
       else
