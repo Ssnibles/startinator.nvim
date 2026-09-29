@@ -32,12 +32,13 @@ vim.api.nvim_create_autocmd("VimEnter", {
       return
     end
 
-    -- Skip if reading piped input from stdin
-    if vim.g.started_with_stdin then
+    -- Skip if reading piped input from stdin (e.g. `cmd | nvim -`)
+    if vim.tbl_contains(vim.v.argv, "-") then
       return
     end
 
-    -- Skip if restoring a session
+    -- Skip if restoring a session. `v:this_session` is authoritative; some
+    -- session plugins additionally set `g:SessionLoad`, so honour it too.
     if vim.g.SessionLoad or vim.v.this_session ~= "" then
       return
     end

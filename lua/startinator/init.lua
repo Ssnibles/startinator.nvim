@@ -5,6 +5,30 @@ local actions = require("startinator.actions")
 
 local M = {}
 
+--- Registry of open dashboards (`buf -> win`). Used by close()/toggle() so
+--- they work from any buffer/window and can manage more than one dashboard.
+local dashboards = {}
+
+--- Every currently valid dashboard buffer.
+---@return number[]
+local function open_dashboards()
+  local bufs = {}
+  for buf in pairs(dashboards) do
+    if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].filetype == "startinator" then
+      table.insert(bufs, buf)
+    else
+      dashboards[buf] = nil
+    end
+  end
+  -- Include the current buffer if it is an untracked dashboard (e.g. after a
+  -- plugin reload).
+  local cur = vim.api.nvim_get_current_buf()
+  if vim.bo[cur].filetype == "startinator" and not vim.tbl_contains(bufs, cur) then
+    table.insert(bufs, cur)
+  end
+  return bufs
+end
+
 --- Generate target distraction-free window options
 ---@param opts table
 ---@return table
@@ -20,7 +44,7 @@ local function get_target_win_opts(opts)
     wrap = false,
     spell = false,
     list = false,
-    cursorline = opts and opts.cursorline == true or false,
+    cursorline = opts ~= nil and opts.cursorline == true,
     cursorcolumn = false,
     fillchars = "eob: ",
   }
@@ -98,22 +122,26 @@ function M.open()
     end
   end
 
-  local function restore_win_opts()
-    if vim.api.nvim_win_is_valid(win) then
-      for opt, val in pairs(saved_win_opts) do
-        pcall(vim.api.nvim_set_option_value, opt, val, { win = win })
+  --- Restore the original window options.
+  --- When `force` is false, skip if the window now shows a dashboard, so a
+  --- scheduled restore cannot clobber a freshly re-opened dashboard.
+  local function restore_win_opts(force)
+    if not vim.api.nvim_win_is_valid(win) then
+      return
+    end
+    if not force then
+      local cur = vim.api.nvim_win_get_buf(win)
+      if vim.api.nvim_buf_is_valid(cur) and vim.bo[cur].filetype == "startinator" then
+        return
       end
+    end
+    for opt, val in pairs(saved_win_opts) do
+      pcall(vim.api.nvim_set_option_value, opt, val, { win = win })
     end
   end
 
-  -- Apply distraction-free window options
-  apply_win_opts()
-
-  -- Render sections and attach keymaps
-  render.draw(buf, win, config.options)
-  keymaps.setup(buf, config.options)
-
-  -- Augroup for buffer events
+  -- Register buffer-local autocmds BEFORE applying options/rendering, so that a
+  -- failure while rendering can still be cleaned up when the buffer is left.
   local group_name = "StartinatorBuffer_" .. buf
   local group = vim.api.nvim_create_augroup(group_name, { clear = true })
 
@@ -124,6 +152,8 @@ function M.open()
     callback = function()
       if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_win_is_valid(win) then
         render.draw(buf, win, config.options)
+        -- Items (e.g. MRU) may have changed; rebind their hotkeys.
+        keymaps.setup(buf, config.options)
       end
     end,
   })
@@ -156,7 +186,7 @@ function M.open()
     buffer = buf,
     callback = function()
       if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) ~= buf then
-        restore_win_opts()
+        restore_win_opts(false)
       end
     end,
   })
@@ -167,24 +197,39 @@ function M.open()
     buffer = buf,
     once = true,
     callback = function()
-      restore_win_opts()
+      restore_win_opts(true)
+      -- Some global-local window options (e.g. `fillchars`) get clobbered back
+      -- to their global value during the buffer switch that follows BufWipeout.
+      -- A guarded restore after the switch fixes those up.
+      vim.schedule(function()
+        restore_win_opts(false)
+      end)
+      dashboards[buf] = nil
       pcall(vim.api.nvim_del_augroup_by_name, group_name)
     end,
   })
+
+  -- Apply distraction-free window options and render
+  dashboards[buf] = win
+  apply_win_opts()
+
+  local ok, err = pcall(render.draw, buf, win, config.options)
+  if not ok then
+    vim.notify("startinator: failed to render dashboard: " .. tostring(err), vim.log.levels.ERROR)
+  end
+  keymaps.setup(buf, config.options)
 end
 
---- Close startpage if currently open
+--- Close startpage if currently open (works from any buffer/window)
 function M.close()
-  local current_buf = vim.api.nvim_get_current_buf()
-  if vim.bo[current_buf].filetype == "startinator" then
-    actions.quit(current_buf)
+  for _, buf in ipairs(open_dashboards()) do
+    actions.quit(buf)
   end
 end
 
 --- Toggle startpage open / close
 function M.toggle()
-  local current_buf = vim.api.nvim_get_current_buf()
-  if vim.bo[current_buf].filetype == "startinator" then
+  if #open_dashboards() > 0 then
     M.close()
   else
     M.open()

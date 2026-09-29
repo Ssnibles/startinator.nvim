@@ -71,8 +71,34 @@ local pickers = {
     files = function(m)
       m.builtin.files()
     end,
-    recent = function(m)
-      m.builtin.cli({ command = { "git", "status" } })
+    recent = function(m, cwd_only)
+      -- mini.pick has no oldfiles builtin; build a source from v:oldfiles.
+      if not m.start then
+        return false
+      end
+      local cwd = vim.fn.getcwd()
+      local items = {}
+      for _, path in ipairs(vim.v.oldfiles or {}) do
+        if type(path) == "string" and path ~= "" then
+          local abs = vim.fs.normalize(vim.fn.fnamemodify(path, ":p"))
+          if vim.fn.filereadable(abs) == 1 and (not cwd_only or vim.fs.relpath(cwd, abs) ~= nil) then
+            table.insert(items, abs)
+          end
+        end
+      end
+      if #items == 0 then
+        return false
+      end
+      m.start({
+        source = {
+          name = "Recent files",
+          items = items,
+          choose = function(item)
+            vim.cmd("edit " .. vim.fn.fnameescape(item))
+          end,
+        },
+      })
+      return true
     end,
     grep = function(m)
       m.builtin.grep_live()
@@ -88,9 +114,14 @@ local function run_picker(method, arg, fallback)
   for _, p in ipairs(pickers) do
     local handle = p.available()
     if handle and p[method] then
-      return safe_call(function()
-        p[method](handle, arg)
+      -- A picker may decline to handle the request by returning `false`, in
+      -- which case we keep looking (or fall back).
+      local ok, handled = safe_call(function()
+        return p[method](handle, arg)
       end)
+      if ok and handled ~= false then
+        return
+      end
     end
   end
   safe_call(fallback)
@@ -209,7 +240,9 @@ function M.execute(act, buf)
         handler(buf)
       end)
     end
-    -- Fallback: execute as Vim command
+    -- Fallback: execute as a Vim command. This is an intentional/documented
+    -- feature (e.g. `action = "edit ~/.config/nvim"`); invalid commands are
+    -- reported by safe_call rather than silently ignored.
     safe_call(function()
       vim.cmd(act)
     end)
