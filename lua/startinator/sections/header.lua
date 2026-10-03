@@ -42,6 +42,13 @@ function M.render(config)
       cwd = "~" .. cwd:sub(#home + 1)
     end
     local prefix = show_icons and "  " or ""
+    -- Keep the path within the same content block as the sections below it
+    -- (Actions/Recent), trimming whole leading path segments if needed.
+    local width = config._resolved_width or config.width or 46
+    local avail = width - vim.fn.strdisplaywidth(prefix)
+    if avail > 0 then
+      cwd = utils.truncate_path_left(cwd, avail)
+    end
     table.insert(lines, { { prefix .. cwd, "StartinatorCwd" } })
   end
 

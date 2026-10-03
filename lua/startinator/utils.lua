@@ -44,6 +44,89 @@ function M.truncate(str, max_w)
   return "…"
 end
 
+--- Truncate a string to a max display width, keeping the right-most
+--- characters and marking the removed prefix with an ellipsis.
+---@param str string
+---@param max_w number
+---@param ellipsis string|nil
+---@return string
+function M.truncate_left(str, max_w, ellipsis)
+  ellipsis = ellipsis or "..."
+  if max_w <= 0 then
+    return ""
+  end
+  if vim.fn.strdisplaywidth(str) <= max_w then
+    return str
+  end
+
+  local ell_w = vim.fn.strdisplaywidth(ellipsis)
+  local prefix = ""
+  local avail = max_w
+  if max_w > ell_w then
+    prefix = ellipsis
+    avail = max_w - ell_w
+  end
+
+  local chars = vim.fn.strchars(str)
+  local acc = 0
+  local start = chars
+  for i = chars - 1, 0, -1 do
+    local w = vim.fn.strdisplaywidth(vim.fn.strcharpart(str, i, 1))
+    if acc + w > avail then
+      break
+    end
+    acc = acc + w
+    start = i
+  end
+
+  return prefix .. vim.fn.strcharpart(str, start)
+end
+
+--- Left-truncate a path to a max display width, keeping whole path segments
+--- where possible. The removed leading portion is replaced with an ellipsis.
+---@param path string
+---@param max_w number
+---@param ellipsis string|nil Defaults to "..."
+---@return string
+function M.truncate_path_left(path, max_w, ellipsis)
+  ellipsis = ellipsis or "..."
+  if max_w <= 0 then
+    return ""
+  end
+  if vim.fn.strdisplaywidth(path) <= max_w then
+    return path
+  end
+
+  local parts = {}
+  for part in path:gmatch("[^/\\]+") do
+    table.insert(parts, part)
+  end
+
+  -- No segment boundary to trim at: fall back to a character-level cut.
+  if #parts <= 1 then
+    return M.truncate_left(path, max_w, ellipsis)
+  end
+
+  -- Grow the suffix one whole segment at a time, from the right.
+  local suffix = parts[#parts]
+  for i = #parts - 1, 1, -1 do
+    local candidate = parts[i] .. "/" .. suffix
+    if vim.fn.strdisplaywidth(ellipsis .. "/" .. candidate) <= max_w then
+      suffix = candidate
+    else
+      break
+    end
+  end
+
+  local candidate = ellipsis .. "/" .. suffix
+  if vim.fn.strdisplaywidth(candidate) <= max_w then
+    return candidate
+  end
+
+  -- Even the final segment does not fit: trim it character by character.
+  return M.truncate_left(path, max_w, ellipsis)
+end
+
 --- Get icon and highlight group for a file
 ---@param filepath string
 ---@param show_icons boolean|nil

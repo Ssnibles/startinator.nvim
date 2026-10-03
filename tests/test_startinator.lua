@@ -207,6 +207,37 @@ do
   check(ok, "open in a narrow window does not error" .. (ok and "" or (": " .. tostring(err))))
 end
 
+-- 13. Long cwd paths are left-truncated at whole path segments to fit the
+--     same content width as the sections below the header.
+do
+  local utils = require("startinator.utils")
+  local truncated = utils.truncate_path_left("/home/josh/dev/my-project", 20)
+  check(truncated == ".../dev/my-project", "truncate_path_left keeps whole trailing segments")
+  check(vim.fn.strdisplaywidth(truncated) <= 20, "truncate_path_left respects the width bound")
+
+  local hard = utils.truncate_path_left("~/verylongsingleworddirectoryname", 12)
+  check(vim.fn.strdisplaywidth(hard) <= 12, "truncate_path_left respects width without segment boundaries")
+
+  local deep = "/tmp/" .. string.rep("segment/", 8) .. "final"
+  vim.fn.mkdir(deep, "p")
+  local original_cwd = vim.fn.getcwd()
+  vim.api.nvim_set_current_dir(deep)
+  local header = require("startinator.sections.header")
+  local res = header.render({ header = { enabled = true, cwd = true }, _resolved_width = 30 })
+  vim.api.nvim_set_current_dir(original_cwd)
+  local cwd_line = nil
+  for _, line in ipairs(res.lines) do
+    for _, chunk in ipairs(line) do
+      if chunk[2] == "StartinatorCwd" then
+        cwd_line = chunk[1]
+      end
+    end
+  end
+  check(cwd_line ~= nil, "header renders a cwd line")
+  check(vim.fn.strdisplaywidth(cwd_line) <= 30, "header cwd fits the shared content width")
+  check(cwd_line:find("%.%.%.") ~= nil, "header cwd is marked with an ellipsis when trimmed")
+end
+
 io.stdout:write(string.format("\n%d checks passed, %d failed\n", passed, #failures))
 io.stdout:flush()
 if #failures > 0 then
