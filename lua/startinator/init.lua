@@ -117,7 +117,10 @@ function M.open()
   local function apply_win_opts()
     if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
       for opt, val in pairs(target_win_opts) do
-        pcall(vim.api.nvim_set_option_value, opt, val, { win = win })
+        -- `scope = "local"` is required: setting a window-local option on the
+        -- *current* window also writes the global default in some Neovim
+        -- versions, which would disable e.g. line numbers everywhere.
+        pcall(vim.api.nvim_set_option_value, opt, val, { win = win, scope = "local" })
       end
     end
   end
@@ -136,7 +139,7 @@ function M.open()
       end
     end
     for opt, val in pairs(saved_win_opts) do
-      pcall(vim.api.nvim_set_option_value, opt, val, { win = win })
+      pcall(vim.api.nvim_set_option_value, opt, val, { win = win, scope = "local" })
     end
   end
 
